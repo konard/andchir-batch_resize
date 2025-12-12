@@ -411,8 +411,8 @@ class MainWindow(QMainWindow):
         lang_layout = QHBoxLayout()
         lang_layout.addStretch()
 
-        lang_label = QLabel(self.translator.get("language"))
-        lang_layout.addWidget(lang_label)
+        self.lang_label = QLabel(self.translator.get("language"))
+        lang_layout.addWidget(self.lang_label)
 
         self.language_combo = QComboBox()
         self.language_combo.addItem(self.translator.get("language_en"), "en")
@@ -434,35 +434,114 @@ class MainWindow(QMainWindow):
         new_language = self.language_combo.itemData(index)
         self.translator.set_language(new_language)
 
-        # Show message that restart is recommended
-        QMessageBox.information(
-            self,
-            self.translator.get("language"),
-            "Language changed. Please restart the application for full effect.\n\n"
-            "Язык изменен. Пожалуйста, перезапустите приложение для полного эффекта."
-        )
+        # Update all UI elements with new translations
+        self.update_ui_translations()
+
+    def update_ui_translations(self):
+        """Update all UI elements with current language translations."""
+        # Window title
+        self.setWindowTitle(self.translator.get("window_title"))
+
+        # Language selector
+        self.lang_label.setText(self.translator.get("language"))
+        # Update combo box items without triggering the change event
+        self.language_combo.blockSignals(True)
+        self.language_combo.setItemText(0, self.translator.get("language_en"))
+        self.language_combo.setItemText(1, self.translator.get("language_ru"))
+        self.language_combo.blockSignals(False)
+
+        # Update tab titles
+        self.tab_widget.setTabText(0, self.translator.get("tab_video_resize"))
+        self.tab_widget.setTabText(1, self.translator.get("tab_file_download"))
+        self.tab_widget.setTabText(2, self.translator.get("tab_file_rename"))
+
+        # Video Resize Tab
+        self.video_title_label.setText(self.translator.get("video_title"))
+        self.video_input_group.setTitle(self.translator.get("settings"))
+        self.video_folder_label.setText(self.translator.get("folder_with_videos"))
+        self.folder_input.setPlaceholderText(self.translator.get("select_video_folder"))
+        self.browse_button.setText(self.translator.get("browse"))
+        self.video_height_label.setText(self.translator.get("target_height"))
+        self.remove_audio_checkbox.setText(self.translator.get("remove_audio"))
+        self.create_thumbs_checkbox.setText(self.translator.get("create_thumbs"))
+        self.video_log_group.setTitle(self.translator.get("processing_log"))
+        self.start_button.setText(self.translator.get("start_processing"))
+        self.stop_button.setText(self.translator.get("stop"))
+
+        # File Download Tab
+        self.download_title_label.setText(self.translator.get("download_title"))
+        self.download_input_group.setTitle(self.translator.get("settings"))
+        self.download_url_file_label.setText(self.translator.get("url_file"))
+        self.download_file_input.setPlaceholderText(self.translator.get("select_url_file"))
+        self.download_browse_file_button.setText(self.translator.get("browse"))
+        self.download_folder_label.setText(self.translator.get("download_folder"))
+        self.download_folder_input.setPlaceholderText(self.translator.get("select_download_folder"))
+        self.download_browse_folder_button.setText(self.translator.get("browse"))
+        self.download_log_group.setTitle(self.translator.get("download_log"))
+        self.download_start_button.setText(self.translator.get("start_download"))
+        self.download_stop_button.setText(self.translator.get("stop"))
+
+        # File Rename Tab
+        self.rename_title_label.setText(self.translator.get("rename_title"))
+        self.rename_input_group.setTitle(self.translator.get("settings"))
+        self.rename_folder_label.setText(self.translator.get("folder_with_files"))
+        self.rename_folder_input.setPlaceholderText(self.translator.get("select_files_folder"))
+        self.rename_browse_button.setText(self.translator.get("browse"))
+        self.rename_sort_label.setText(self.translator.get("sort"))
+
+        # Update rename sort combo box items
+        self.rename_sort_combo.blockSignals(True)
+        self.rename_sort_combo.setItemText(0, self.translator.get("sort_name"))
+        self.rename_sort_combo.setItemText(1, self.translator.get("sort_number"))
+        self.rename_sort_combo.blockSignals(False)
+
+        self.rename_type_label.setText(self.translator.get("rename_type"))
+
+        # Update rename type combo box items
+        self.rename_type_combo.blockSignals(True)
+        self.rename_type_combo.setItemText(0, self.translator.get("rename_sequential"))
+        self.rename_type_combo.setItemText(1, self.translator.get("rename_numbers_only"))
+        self.rename_type_combo.setItemText(2, self.translator.get("rename_text_only"))
+        self.rename_type_combo.setItemText(3, self.translator.get("rename_numbers_only_at_end"))
+        self.rename_type_combo.blockSignals(False)
+
+        self.rename_prefix_label.setText(self.translator.get("prefix"))
+        self.rename_prefix_input.setPlaceholderText(self.translator.get("prefix_placeholder"))
+        self.rename_suffix_label.setText(self.translator.get("suffix"))
+        self.rename_suffix_input.setPlaceholderText(self.translator.get("suffix_placeholder"))
+        self.rename_zero_padding_label.setText(self.translator.get("zero_padding"))
+        self.rename_zero_num_spinbox.setToolTip(self.translator.get("zero_padding_tooltip"))
+        self.rename_zero_padding_hint_label.setText(self.translator.get("zero_padding_hint"))
+        self.rename_dry_run_checkbox.setText(self.translator.get("dry_run"))
+        self.rename_log_group.setTitle(self.translator.get("rename_log"))
+        self.rename_start_button.setText(self.translator.get("start_rename"))
+        self.rename_stop_button.setText(self.translator.get("stop"))
+
+        # Status bar
+        self.statusBar().showMessage(self.translator.get("ready"))
 
     def create_video_resize_tab(self):
         """Create the video resize tab."""
-        video_tab = QWidget()
-        tab_layout = QVBoxLayout(video_tab)
+        self.video_tab = QWidget()
+        tab_layout = QVBoxLayout(self.video_tab)
 
         # Title
-        title_label = QLabel(self.translator.get("video_title"))
+        self.video_title_label = QLabel(self.translator.get("video_title"))
         title_font = QFont()
         title_font.setPointSize(16)
         title_font.setBold(True)
-        title_label.setFont(title_font)
-        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        tab_layout.addWidget(title_label)
+        self.video_title_label.setFont(title_font)
+        self.video_title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        tab_layout.addWidget(self.video_title_label)
 
         # Input group
-        input_group = QGroupBox(self.translator.get("settings"))
+        self.video_input_group = QGroupBox(self.translator.get("settings"))
         input_layout = QVBoxLayout()
 
         # Folder selection
         folder_layout = QHBoxLayout()
-        folder_layout.addWidget(QLabel(self.translator.get("folder_with_videos")))
+        self.video_folder_label = QLabel(self.translator.get("folder_with_videos"))
+        folder_layout.addWidget(self.video_folder_label)
         self.folder_input = QLineEdit()
         self.folder_input.setPlaceholderText(self.translator.get("select_video_folder"))
         folder_layout.addWidget(self.folder_input)
@@ -473,7 +552,8 @@ class MainWindow(QMainWindow):
 
         # Height setting
         height_layout = QHBoxLayout()
-        height_layout.addWidget(QLabel(self.translator.get("target_height")))
+        self.video_height_label = QLabel(self.translator.get("target_height"))
+        height_layout.addWidget(self.video_height_label)
         self.height_spinbox = QSpinBox()
         self.height_spinbox.setMinimum(1)
         self.height_spinbox.setMaximum(8192)
@@ -490,8 +570,8 @@ class MainWindow(QMainWindow):
         self.create_thumbs_checkbox = QCheckBox(self.translator.get("create_thumbs"))
         input_layout.addWidget(self.create_thumbs_checkbox)
 
-        input_group.setLayout(input_layout)
-        tab_layout.addWidget(input_group)
+        self.video_input_group.setLayout(input_layout)
+        tab_layout.addWidget(self.video_input_group)
 
         # Progress bar
         self.progress_bar = QProgressBar()
@@ -499,14 +579,14 @@ class MainWindow(QMainWindow):
         tab_layout.addWidget(self.progress_bar)
 
         # Log output
-        log_group = QGroupBox(self.translator.get("processing_log"))
+        self.video_log_group = QGroupBox(self.translator.get("processing_log"))
         log_layout = QVBoxLayout()
         self.log_text = QTextEdit()
         self.log_text.setReadOnly(True)
         self.log_text.setMaximumHeight(200)
         log_layout.addWidget(self.log_text)
-        log_group.setLayout(log_layout)
-        tab_layout.addWidget(log_group)
+        self.video_log_group.setLayout(log_layout)
+        tab_layout.addWidget(self.video_log_group)
 
         # Control buttons
         button_layout = QHBoxLayout()
@@ -527,29 +607,30 @@ class MainWindow(QMainWindow):
         tab_layout.addLayout(button_layout)
 
         # Add tab to tab widget
-        self.tab_widget.addTab(video_tab, self.translator.get("tab_video_resize"))
+        self.tab_widget.addTab(self.video_tab, self.translator.get("tab_video_resize"))
 
     def create_file_download_tab(self):
         """Create the file download tab."""
-        download_tab = QWidget()
-        tab_layout = QVBoxLayout(download_tab)
+        self.download_tab = QWidget()
+        tab_layout = QVBoxLayout(self.download_tab)
 
         # Title
-        title_label = QLabel(self.translator.get("download_title"))
+        self.download_title_label = QLabel(self.translator.get("download_title"))
         title_font = QFont()
         title_font.setPointSize(16)
         title_font.setBold(True)
-        title_label.setFont(title_font)
-        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        tab_layout.addWidget(title_label)
+        self.download_title_label.setFont(title_font)
+        self.download_title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        tab_layout.addWidget(self.download_title_label)
 
         # Input group
-        input_group = QGroupBox(self.translator.get("settings"))
+        self.download_input_group = QGroupBox(self.translator.get("settings"))
         input_layout = QVBoxLayout()
 
         # Input file selection
         input_file_layout = QHBoxLayout()
-        input_file_layout.addWidget(QLabel(self.translator.get("url_file")))
+        self.download_url_file_label = QLabel(self.translator.get("url_file"))
+        input_file_layout.addWidget(self.download_url_file_label)
         self.download_file_input = QLineEdit()
         self.download_file_input.setPlaceholderText(self.translator.get("select_url_file"))
         input_file_layout.addWidget(self.download_file_input)
@@ -560,7 +641,8 @@ class MainWindow(QMainWindow):
 
         # Output folder selection
         output_folder_layout = QHBoxLayout()
-        output_folder_layout.addWidget(QLabel(self.translator.get("download_folder")))
+        self.download_folder_label = QLabel(self.translator.get("download_folder"))
+        output_folder_layout.addWidget(self.download_folder_label)
         self.download_folder_input = QLineEdit()
         self.download_folder_input.setPlaceholderText(self.translator.get("select_download_folder"))
         output_folder_layout.addWidget(self.download_folder_input)
@@ -569,8 +651,8 @@ class MainWindow(QMainWindow):
         output_folder_layout.addWidget(self.download_browse_folder_button)
         input_layout.addLayout(output_folder_layout)
 
-        input_group.setLayout(input_layout)
-        tab_layout.addWidget(input_group)
+        self.download_input_group.setLayout(input_layout)
+        tab_layout.addWidget(self.download_input_group)
 
         # Progress bar
         self.download_progress_bar = QProgressBar()
@@ -578,14 +660,14 @@ class MainWindow(QMainWindow):
         tab_layout.addWidget(self.download_progress_bar)
 
         # Log output
-        log_group = QGroupBox(self.translator.get("download_log"))
+        self.download_log_group = QGroupBox(self.translator.get("download_log"))
         log_layout = QVBoxLayout()
         self.download_log_text = QTextEdit()
         self.download_log_text.setReadOnly(True)
         self.download_log_text.setMaximumHeight(200)
         log_layout.addWidget(self.download_log_text)
-        log_group.setLayout(log_layout)
-        tab_layout.addWidget(log_group)
+        self.download_log_group.setLayout(log_layout)
+        tab_layout.addWidget(self.download_log_group)
 
         # Control buttons
         button_layout = QHBoxLayout()
@@ -606,29 +688,30 @@ class MainWindow(QMainWindow):
         tab_layout.addLayout(button_layout)
 
         # Add tab to tab widget
-        self.tab_widget.addTab(download_tab, self.translator.get("tab_file_download"))
+        self.tab_widget.addTab(self.download_tab, self.translator.get("tab_file_download"))
 
     def create_file_rename_tab(self):
         """Create the file rename tab."""
-        rename_tab = QWidget()
-        tab_layout = QVBoxLayout(rename_tab)
+        self.rename_tab = QWidget()
+        tab_layout = QVBoxLayout(self.rename_tab)
 
         # Title
-        title_label = QLabel(self.translator.get("rename_title"))
+        self.rename_title_label = QLabel(self.translator.get("rename_title"))
         title_font = QFont()
         title_font.setPointSize(16)
         title_font.setBold(True)
-        title_label.setFont(title_font)
-        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        tab_layout.addWidget(title_label)
+        self.rename_title_label.setFont(title_font)
+        self.rename_title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        tab_layout.addWidget(self.rename_title_label)
 
         # Input group
-        input_group = QGroupBox(self.translator.get("settings"))
+        self.rename_input_group = QGroupBox(self.translator.get("settings"))
         input_layout = QVBoxLayout()
 
         # Folder selection
         folder_layout = QHBoxLayout()
-        folder_layout.addWidget(QLabel(self.translator.get("folder_with_files")))
+        self.rename_folder_label = QLabel(self.translator.get("folder_with_files"))
+        folder_layout.addWidget(self.rename_folder_label)
         self.rename_folder_input = QLineEdit()
         self.rename_folder_input.setPlaceholderText(self.translator.get("select_files_folder"))
         folder_layout.addWidget(self.rename_folder_input)
@@ -639,7 +722,8 @@ class MainWindow(QMainWindow):
 
         # Sort type selection
         sort_layout = QHBoxLayout()
-        sort_layout.addWidget(QLabel(self.translator.get("sort")))
+        self.rename_sort_label = QLabel(self.translator.get("sort"))
+        sort_layout.addWidget(self.rename_sort_label)
 
         self.rename_sort_combo = QComboBox()
         self.rename_sort_combo.addItem(self.translator.get("sort_name"), "name")
@@ -650,7 +734,8 @@ class MainWindow(QMainWindow):
 
         # Rename type selection
         rename_type_layout = QHBoxLayout()
-        rename_type_layout.addWidget(QLabel(self.translator.get("rename_type")))
+        self.rename_type_label = QLabel(self.translator.get("rename_type"))
+        rename_type_layout.addWidget(self.rename_type_label)
         self.rename_type_combo = QComboBox()
         self.rename_type_combo.addItem(self.translator.get("rename_sequential"), "sequential")
         self.rename_type_combo.addItem(self.translator.get("rename_numbers_only"), "numbers_only")
@@ -662,7 +747,8 @@ class MainWindow(QMainWindow):
 
         # Prefix input
         prefix_layout = QHBoxLayout()
-        prefix_layout.addWidget(QLabel(self.translator.get("prefix")))
+        self.rename_prefix_label = QLabel(self.translator.get("prefix"))
+        prefix_layout.addWidget(self.rename_prefix_label)
         self.rename_prefix_input = QLineEdit()
         self.rename_prefix_input.setPlaceholderText(self.translator.get("prefix_placeholder"))
         prefix_layout.addWidget(self.rename_prefix_input)
@@ -671,7 +757,8 @@ class MainWindow(QMainWindow):
 
         # Suffix input
         suffix_layout = QHBoxLayout()
-        suffix_layout.addWidget(QLabel(self.translator.get("suffix")))
+        self.rename_suffix_label = QLabel(self.translator.get("suffix"))
+        suffix_layout.addWidget(self.rename_suffix_label)
         self.rename_suffix_input = QLineEdit()
         self.rename_suffix_input.setPlaceholderText(self.translator.get("suffix_placeholder"))
         suffix_layout.addWidget(self.rename_suffix_input)
@@ -680,14 +767,16 @@ class MainWindow(QMainWindow):
 
         # Zero padding input
         zero_num_layout = QHBoxLayout()
-        zero_num_layout.addWidget(QLabel(self.translator.get("zero_padding")))
+        self.rename_zero_padding_label = QLabel(self.translator.get("zero_padding"))
+        zero_num_layout.addWidget(self.rename_zero_padding_label)
         self.rename_zero_num_spinbox = QSpinBox()
         self.rename_zero_num_spinbox.setMinimum(0)
         self.rename_zero_num_spinbox.setMaximum(10)
         self.rename_zero_num_spinbox.setValue(0)
         self.rename_zero_num_spinbox.setToolTip(self.translator.get("zero_padding_tooltip"))
         zero_num_layout.addWidget(self.rename_zero_num_spinbox)
-        zero_num_layout.addWidget(QLabel(self.translator.get("zero_padding_hint")))
+        self.rename_zero_padding_hint_label = QLabel(self.translator.get("zero_padding_hint"))
+        zero_num_layout.addWidget(self.rename_zero_padding_hint_label)
         zero_num_layout.addStretch()
         input_layout.addLayout(zero_num_layout)
 
@@ -696,8 +785,8 @@ class MainWindow(QMainWindow):
         self.rename_dry_run_checkbox.setChecked(True)  # Enable by default for safety
         input_layout.addWidget(self.rename_dry_run_checkbox)
 
-        input_group.setLayout(input_layout)
-        tab_layout.addWidget(input_group)
+        self.rename_input_group.setLayout(input_layout)
+        tab_layout.addWidget(self.rename_input_group)
 
         # Progress bar
         self.rename_progress_bar = QProgressBar()
@@ -705,14 +794,14 @@ class MainWindow(QMainWindow):
         tab_layout.addWidget(self.rename_progress_bar)
 
         # Log output
-        log_group = QGroupBox(self.translator.get("rename_log"))
+        self.rename_log_group = QGroupBox(self.translator.get("rename_log"))
         log_layout = QVBoxLayout()
         self.rename_log_text = QTextEdit()
         self.rename_log_text.setReadOnly(True)
         self.rename_log_text.setMaximumHeight(200)
         log_layout.addWidget(self.rename_log_text)
-        log_group.setLayout(log_layout)
-        tab_layout.addWidget(log_group)
+        self.rename_log_group.setLayout(log_layout)
+        tab_layout.addWidget(self.rename_log_group)
 
         # Control buttons
         button_layout = QHBoxLayout()
@@ -733,7 +822,7 @@ class MainWindow(QMainWindow):
         tab_layout.addLayout(button_layout)
 
         # Add tab to tab widget
-        self.tab_widget.addTab(rename_tab, self.translator.get("tab_file_rename"))
+        self.tab_widget.addTab(self.rename_tab, self.translator.get("tab_file_rename"))
 
     def browse_folder(self):
         """Open folder browser dialog."""
