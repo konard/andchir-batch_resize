@@ -24,6 +24,7 @@ from download import (
 from rename import (
     get_files_in_folder, sort_files, rename_files
 )
+from translations import get_translator, tr
 
 
 class VideoProcessorThread(QThread):
@@ -33,12 +34,13 @@ class VideoProcessorThread(QThread):
     log = pyqtSignal(str)  # Log message
     finished = pyqtSignal(dict)  # Processing statistics
 
-    def __init__(self, folder_path: Path, height: int, remove_audio: bool, create_thumbs: bool):
+    def __init__(self, folder_path: Path, height: int, remove_audio: bool, create_thumbs: bool, translator):
         super().__init__()
         self.folder_path = folder_path
         self.height = height
         self.remove_audio = remove_audio
         self.create_thumbs = create_thumbs
+        self.translator = translator
         self._is_running = True
 
     def stop(self):
@@ -52,7 +54,7 @@ class VideoProcessorThread(QThread):
             video_files = get_video_files(self.folder_path)
 
             if not video_files:
-                self.log.emit(f"Видеофайлы не найдены в '{self.folder_path}'")
+                self.log.emit(self.translator.get("videos_not_found", self.folder_path))
                 self.finished.emit({
                     'successful': 0,
                     'failed': 0,
@@ -62,19 +64,19 @@ class VideoProcessorThread(QThread):
                 })
                 return
 
-            self.log.emit(f"Найдено {len(video_files)} видеофайл(ов) в '{self.folder_path}'")
+            self.log.emit(self.translator.get("videos_found", len(video_files), self.folder_path))
 
             # Create output directory
             output_dir = self.folder_path / "output"
             output_dir.mkdir(exist_ok=True)
-            self.log.emit(f"Папка для вывода: {output_dir}")
+            self.log.emit(self.translator.get("output_folder", output_dir))
 
             # Create thumbs directory if needed
             thumbs_dir = None
             if self.create_thumbs:
                 thumbs_dir = self.folder_path / "thumbs"
                 thumbs_dir.mkdir(exist_ok=True)
-                self.log.emit(f"Папка для миниатюр: {thumbs_dir}")
+                self.log.emit(self.translator.get("thumbs_folder", thumbs_dir))
 
             # Process each video file
             successful = 0
@@ -84,29 +86,29 @@ class VideoProcessorThread(QThread):
 
             for idx, video_file in enumerate(video_files):
                 if not self._is_running:
-                    self.log.emit("Обработка остановлена пользователем")
+                    self.log.emit(self.translator.get("processing_stopped"))
                     break
 
                 output_path = output_dir / video_file.name
 
-                self.log.emit(f"Обработка: {video_file.name}")
+                self.log.emit(self.translator.get("processing_file", video_file.name))
                 if resize_video(video_file, output_path, self.height, self.remove_audio):
                     successful += 1
-                    self.log.emit(f"Завершено: {output_path.name}")
+                    self.log.emit(self.translator.get("completed", output_path.name))
                 else:
                     failed += 1
-                    self.log.emit(f"Ошибка при обработке: {video_file.name}")
+                    self.log.emit(self.translator.get("error_processing", video_file.name))
 
                 # Create thumbnail if requested
                 if self.create_thumbs and self._is_running:
                     thumb_path = thumbs_dir / f"{video_file.stem}.jpg"
-                    self.log.emit(f"Создание миниатюры: {thumb_path.name}")
+                    self.log.emit(self.translator.get("creating_thumb", thumb_path.name))
                     if create_thumbnail(output_path, thumb_path):
                         thumbs_created += 1
-                        self.log.emit(f"Миниатюра создана: {thumb_path.name}")
+                        self.log.emit(self.translator.get("thumb_created", thumb_path.name))
                     else:
                         thumbs_failed += 1
-                        self.log.emit(f"Ошибка создания миниатюры: {thumb_path.name}")
+                        self.log.emit(self.translator.get("thumb_error", thumb_path.name))
 
                 # Update progress
                 progress_percent = int((idx + 1) / len(video_files) * 100)
@@ -122,7 +124,7 @@ class VideoProcessorThread(QThread):
             })
 
         except Exception as e:
-            self.log.emit(f"Критическая ошибка: {str(e)}")
+            self.log.emit(self.translator.get("critical_error", str(e)))
             self.finished.emit({
                 'successful': 0,
                 'failed': 0,
@@ -139,10 +141,11 @@ class FileDownloaderThread(QThread):
     log = pyqtSignal(str)  # Log message
     finished = pyqtSignal(dict)  # Download statistics
 
-    def __init__(self, file_path: Path, output_folder: Path):
+    def __init__(self, file_path: Path, output_folder: Path, translator):
         super().__init__()
         self.file_path = file_path
         self.output_folder = output_folder
+        self.translator = translator
         self._is_running = True
 
     def stop(self):
@@ -153,7 +156,7 @@ class FileDownloaderThread(QThread):
         """Download files in background thread."""
         try:
             # Read file and extract URLs
-            self.log.emit(f"Чтение файла: {self.file_path}")
+            self.log.emit(self.translator.get("reading_file", self.file_path))
             urls = read_file(self.file_path)
 
             # Remove duplicates while preserving order
@@ -165,7 +168,7 @@ class FileDownloaderThread(QThread):
                     unique_urls.append(url)
 
             if not unique_urls:
-                self.log.emit("В файле не найдено URL-ссылок")
+                self.log.emit(self.translator.get("urls_not_found"))
                 self.finished.emit({
                     'successful': 0,
                     'failed': 0,
@@ -174,11 +177,11 @@ class FileDownloaderThread(QThread):
                 })
                 return
 
-            self.log.emit(f"Найдено {len(unique_urls)} уникальных URL-ссылок")
+            self.log.emit(self.translator.get("urls_found", len(unique_urls)))
 
             # Create output folder if it doesn't exist
             self.output_folder.mkdir(parents=True, exist_ok=True)
-            self.log.emit(f"Папка для загрузки: {self.output_folder}")
+            self.log.emit(self.translator.get("download_folder_created", self.output_folder))
 
             # Download each file
             successful = 0
@@ -187,10 +190,10 @@ class FileDownloaderThread(QThread):
 
             for idx, url in enumerate(unique_urls):
                 if not self._is_running:
-                    self.log.emit("Загрузка остановлена пользователем")
+                    self.log.emit(self.translator.get("processing_stopped"))
                     break
 
-                self.log.emit(f"\n[{idx + 1}/{len(unique_urls)}] Обработка: {url}")
+                self.log.emit(self.translator.get("processing_url", idx + 1, len(unique_urls), url))
 
                 # Get filename from URL
                 filename = get_filename_from_url(url)
@@ -198,15 +201,15 @@ class FileDownloaderThread(QThread):
 
                 # Check if file already exists
                 if output_path.exists():
-                    self.log.emit(f"Пропущено (файл существует): {filename}")
+                    self.log.emit(self.translator.get("skipped_exists", filename))
                     skipped += 1
                 else:
                     # Download the file
                     if download_file(url, output_path):
-                        self.log.emit(f"Загружено: {filename}")
+                        self.log.emit(self.translator.get("downloaded", filename))
                         successful += 1
                     else:
-                        self.log.emit(f"Ошибка загрузки: {url}")
+                        self.log.emit(self.translator.get("download_error", url))
                         failed += 1
 
                 # Update progress
@@ -222,7 +225,7 @@ class FileDownloaderThread(QThread):
             })
 
         except Exception as e:
-            self.log.emit(f"Критическая ошибка: {str(e)}")
+            self.log.emit(self.translator.get("critical_error", str(e)))
             self.finished.emit({
                 'successful': 0,
                 'failed': 0,
@@ -239,7 +242,7 @@ class FileRenamerThread(QThread):
     finished = pyqtSignal(dict)  # Rename statistics
 
     def __init__(self, folder_path: Path, sort_type: str, rename_type: str,
-                 prefix: str = "", suffix: str = "", dry_run: bool = False, zero_num: int = 0):
+                 prefix: str = "", suffix: str = "", dry_run: bool = False, zero_num: int = 0, translator=None):
         super().__init__()
         self.folder_path = folder_path
         self.sort_type = sort_type
@@ -248,6 +251,7 @@ class FileRenamerThread(QThread):
         self.suffix = suffix
         self.dry_run = dry_run
         self.zero_num = zero_num
+        self.translator = translator
         self._is_running = True
 
     def stop(self):
@@ -261,7 +265,7 @@ class FileRenamerThread(QThread):
             files = get_files_in_folder(self.folder_path)
 
             if not files:
-                self.log.emit(f"Файлы не найдены в '{self.folder_path}'")
+                self.log.emit(self.translator.get("files_not_found", self.folder_path))
                 self.finished.emit({
                     'successful': 0,
                     'failed': 0,
@@ -269,28 +273,28 @@ class FileRenamerThread(QThread):
                 })
                 return
 
-            self.log.emit(f"Найдено {len(files)} файл(ов) в '{self.folder_path}'")
+            self.log.emit(self.translator.get("files_found", len(files), self.folder_path))
 
             # Display configuration
-            self.log.emit(f"Конфигурация:")
-            self.log.emit(f"  Папка: {self.folder_path}")
-            self.log.emit(f"  Сортировка: {self.sort_type}")
-            self.log.emit(f"  Переименование: {self.rename_type}")
+            self.log.emit(self.translator.get("configuration"))
+            self.log.emit(self.translator.get("folder", self.folder_path))
+            self.log.emit(self.translator.get("sort_type", self.sort_type))
+            self.log.emit(self.translator.get("rename_type_label", self.rename_type))
             if self.prefix:
-                self.log.emit(f"  Префикс: '{self.prefix}'")
+                self.log.emit(self.translator.get("prefix_label", self.prefix))
             if self.suffix:
-                self.log.emit(f"  Суффикс: '{self.suffix}'")
+                self.log.emit(self.translator.get("suffix_label", self.suffix))
             if self.zero_num > 0:
-                self.log.emit(f"  Дополнение нулями: {self.zero_num}")
+                self.log.emit(self.translator.get("zero_padding_label", self.zero_num))
             if self.dry_run:
-                self.log.emit(f"  Режим: Предварительный просмотр (без изменений)")
+                self.log.emit(self.translator.get("mode"))
             self.log.emit("")
 
             # Sort files
             sorted_files = sort_files(files, self.sort_type)
 
             if self.dry_run:
-                self.log.emit("Режим предварительного просмотра - показываются планируемые изменения:")
+                self.log.emit(self.translator.get("preview_mode"))
                 self.log.emit("=" * 60)
 
             successful = 0
@@ -303,7 +307,7 @@ class FileRenamerThread(QThread):
 
             for index, file_path in enumerate(sorted_files, start=1):
                 if not self._is_running:
-                    self.log.emit("Переименование остановлено пользователем")
+                    self.log.emit(self.translator.get("processing_stopped"))
                     break
 
                 try:
@@ -327,21 +331,21 @@ class FileRenamerThread(QThread):
 
                     # Check if target file already exists (and it's not the same file)
                     if new_path.exists() and new_path.resolve() != file_path.resolve():
-                        self.log.emit(f"Ошибка: Целевой файл уже существует: {new_filename}")
+                        self.log.emit(self.translator.get("target_exists", new_filename))
                         failed += 1
                         continue
 
                     if self.dry_run:
-                        self.log.emit(f"[{index}] {file_path.name} -> {new_filename}")
+                        self.log.emit(self.translator.get("preview_renamed", index, file_path.name, new_filename))
                     else:
                         # Perform the rename
                         file_path.rename(new_path)
-                        self.log.emit(f"[{index}] Переименовано: {file_path.name} -> {new_filename}")
+                        self.log.emit(self.translator.get("renamed", index, file_path.name, new_filename))
 
                     successful += 1
 
                 except Exception as e:
-                    self.log.emit(f"Ошибка при переименовании {file_path.name}: {str(e)}")
+                    self.log.emit(self.translator.get("rename_error", file_path.name, str(e)))
                     failed += 1
 
                 # Update progress
@@ -356,7 +360,7 @@ class FileRenamerThread(QThread):
             })
 
         except Exception as e:
-            self.log.emit(f"Критическая ошибка: {str(e)}")
+            self.log.emit(self.translator.get("critical_error", str(e)))
             self.finished.emit({
                 'successful': 0,
                 'failed': 0,
@@ -372,11 +376,12 @@ class MainWindow(QMainWindow):
         self.processor_thread: Optional[VideoProcessorThread] = None
         self.downloader_thread: Optional[FileDownloaderThread] = None
         self.renamer_thread: Optional[FileRenamerThread] = None
+        self.translator = get_translator()
         self.init_ui()
 
     def init_ui(self):
         """Initialize the user interface."""
-        self.setWindowTitle("Batch Media Tools")
+        self.setWindowTitle(self.translator.get("window_title"))
         self.setMinimumSize(800, 600)
 
         # Create central widget
@@ -385,6 +390,9 @@ class MainWindow(QMainWindow):
 
         # Main layout
         main_layout = QVBoxLayout(central_widget)
+
+        # Language selector
+        self.create_language_selector(main_layout)
 
         # Create tab widget
         self.tab_widget = QTabWidget()
@@ -396,7 +404,43 @@ class MainWindow(QMainWindow):
         self.create_file_rename_tab()
 
         # Status bar
-        self.statusBar().showMessage("Готов к работе")
+        self.statusBar().showMessage(self.translator.get("ready"))
+
+    def create_language_selector(self, layout: QVBoxLayout):
+        """Create language selector widget."""
+        lang_layout = QHBoxLayout()
+        lang_layout.addStretch()
+
+        lang_label = QLabel(self.translator.get("language"))
+        lang_layout.addWidget(lang_label)
+
+        self.language_combo = QComboBox()
+        self.language_combo.addItem(self.translator.get("language_en"), "en")
+        self.language_combo.addItem(self.translator.get("language_ru"), "ru")
+
+        # Set current language
+        current_lang = self.translator.language
+        index = self.language_combo.findData(current_lang)
+        if index >= 0:
+            self.language_combo.setCurrentIndex(index)
+
+        self.language_combo.currentIndexChanged.connect(self.on_language_changed)
+        lang_layout.addWidget(self.language_combo)
+
+        layout.addLayout(lang_layout)
+
+    def on_language_changed(self, index: int):
+        """Handle language change."""
+        new_language = self.language_combo.itemData(index)
+        self.translator.set_language(new_language)
+
+        # Show message that restart is recommended
+        QMessageBox.information(
+            self,
+            self.translator.get("language"),
+            "Language changed. Please restart the application for full effect.\n\n"
+            "Язык изменен. Пожалуйста, перезапустите приложение для полного эффекта."
+        )
 
     def create_video_resize_tab(self):
         """Create the video resize tab."""
@@ -404,7 +448,7 @@ class MainWindow(QMainWindow):
         tab_layout = QVBoxLayout(video_tab)
 
         # Title
-        title_label = QLabel("Пакетное изменение размера видео")
+        title_label = QLabel(self.translator.get("video_title"))
         title_font = QFont()
         title_font.setPointSize(16)
         title_font.setBold(True)
@@ -413,23 +457,23 @@ class MainWindow(QMainWindow):
         tab_layout.addWidget(title_label)
 
         # Input group
-        input_group = QGroupBox("Настройки")
+        input_group = QGroupBox(self.translator.get("settings"))
         input_layout = QVBoxLayout()
 
         # Folder selection
         folder_layout = QHBoxLayout()
-        folder_layout.addWidget(QLabel("Папка с видео:"))
+        folder_layout.addWidget(QLabel(self.translator.get("folder_with_videos")))
         self.folder_input = QLineEdit()
-        self.folder_input.setPlaceholderText("Выберите папку с видеофайлами...")
+        self.folder_input.setPlaceholderText(self.translator.get("select_video_folder"))
         folder_layout.addWidget(self.folder_input)
-        self.browse_button = QPushButton("Обзор...")
+        self.browse_button = QPushButton(self.translator.get("browse"))
         self.browse_button.clicked.connect(self.browse_folder)
         folder_layout.addWidget(self.browse_button)
         input_layout.addLayout(folder_layout)
 
         # Height setting
         height_layout = QHBoxLayout()
-        height_layout.addWidget(QLabel("Целевая высота (px):"))
+        height_layout.addWidget(QLabel(self.translator.get("target_height")))
         self.height_spinbox = QSpinBox()
         self.height_spinbox.setMinimum(1)
         self.height_spinbox.setMaximum(8192)
@@ -440,10 +484,10 @@ class MainWindow(QMainWindow):
         input_layout.addLayout(height_layout)
 
         # Options
-        self.remove_audio_checkbox = QCheckBox("Удалить звуковую дорожку")
+        self.remove_audio_checkbox = QCheckBox(self.translator.get("remove_audio"))
         input_layout.addWidget(self.remove_audio_checkbox)
 
-        self.create_thumbs_checkbox = QCheckBox("Создать миниатюры (JPG)")
+        self.create_thumbs_checkbox = QCheckBox(self.translator.get("create_thumbs"))
         input_layout.addWidget(self.create_thumbs_checkbox)
 
         input_group.setLayout(input_layout)
@@ -455,7 +499,7 @@ class MainWindow(QMainWindow):
         tab_layout.addWidget(self.progress_bar)
 
         # Log output
-        log_group = QGroupBox("Журнал обработки")
+        log_group = QGroupBox(self.translator.get("processing_log"))
         log_layout = QVBoxLayout()
         self.log_text = QTextEdit()
         self.log_text.setReadOnly(True)
@@ -468,12 +512,12 @@ class MainWindow(QMainWindow):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
 
-        self.start_button = QPushButton("Начать обработку")
+        self.start_button = QPushButton(self.translator.get("start_processing"))
         self.start_button.clicked.connect(self.start_processing)
         self.start_button.setMinimumWidth(150)
         button_layout.addWidget(self.start_button)
 
-        self.stop_button = QPushButton("Остановить")
+        self.stop_button = QPushButton(self.translator.get("stop"))
         self.stop_button.clicked.connect(self.stop_processing)
         self.stop_button.setEnabled(False)
         self.stop_button.setMinimumWidth(150)
@@ -483,7 +527,7 @@ class MainWindow(QMainWindow):
         tab_layout.addLayout(button_layout)
 
         # Add tab to tab widget
-        self.tab_widget.addTab(video_tab, "Изменение размера видео")
+        self.tab_widget.addTab(video_tab, self.translator.get("tab_video_resize"))
 
     def create_file_download_tab(self):
         """Create the file download tab."""
@@ -491,7 +535,7 @@ class MainWindow(QMainWindow):
         tab_layout = QVBoxLayout(download_tab)
 
         # Title
-        title_label = QLabel("Загрузка файлов из URL-ссылок")
+        title_label = QLabel(self.translator.get("download_title"))
         title_font = QFont()
         title_font.setPointSize(16)
         title_font.setBold(True)
@@ -500,27 +544,27 @@ class MainWindow(QMainWindow):
         tab_layout.addWidget(title_label)
 
         # Input group
-        input_group = QGroupBox("Настройки")
+        input_group = QGroupBox(self.translator.get("settings"))
         input_layout = QVBoxLayout()
 
         # Input file selection
         input_file_layout = QHBoxLayout()
-        input_file_layout.addWidget(QLabel("Файл с URL (XLS/XLSX/CSV):"))
+        input_file_layout.addWidget(QLabel(self.translator.get("url_file")))
         self.download_file_input = QLineEdit()
-        self.download_file_input.setPlaceholderText("Выберите файл с URL-ссылками...")
+        self.download_file_input.setPlaceholderText(self.translator.get("select_url_file"))
         input_file_layout.addWidget(self.download_file_input)
-        self.download_browse_file_button = QPushButton("Обзор...")
+        self.download_browse_file_button = QPushButton(self.translator.get("browse"))
         self.download_browse_file_button.clicked.connect(self.browse_download_file)
         input_file_layout.addWidget(self.download_browse_file_button)
         input_layout.addLayout(input_file_layout)
 
         # Output folder selection
         output_folder_layout = QHBoxLayout()
-        output_folder_layout.addWidget(QLabel("Папка для загрузки:"))
+        output_folder_layout.addWidget(QLabel(self.translator.get("download_folder")))
         self.download_folder_input = QLineEdit()
-        self.download_folder_input.setPlaceholderText("Выберите папку для сохранения файлов...")
+        self.download_folder_input.setPlaceholderText(self.translator.get("select_download_folder"))
         output_folder_layout.addWidget(self.download_folder_input)
-        self.download_browse_folder_button = QPushButton("Обзор...")
+        self.download_browse_folder_button = QPushButton(self.translator.get("browse"))
         self.download_browse_folder_button.clicked.connect(self.browse_download_folder)
         output_folder_layout.addWidget(self.download_browse_folder_button)
         input_layout.addLayout(output_folder_layout)
@@ -534,7 +578,7 @@ class MainWindow(QMainWindow):
         tab_layout.addWidget(self.download_progress_bar)
 
         # Log output
-        log_group = QGroupBox("Журнал загрузки")
+        log_group = QGroupBox(self.translator.get("download_log"))
         log_layout = QVBoxLayout()
         self.download_log_text = QTextEdit()
         self.download_log_text.setReadOnly(True)
@@ -547,12 +591,12 @@ class MainWindow(QMainWindow):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
 
-        self.download_start_button = QPushButton("Начать загрузку")
+        self.download_start_button = QPushButton(self.translator.get("start_download"))
         self.download_start_button.clicked.connect(self.start_downloading)
         self.download_start_button.setMinimumWidth(150)
         button_layout.addWidget(self.download_start_button)
 
-        self.download_stop_button = QPushButton("Остановить")
+        self.download_stop_button = QPushButton(self.translator.get("stop"))
         self.download_stop_button.clicked.connect(self.stop_downloading)
         self.download_stop_button.setEnabled(False)
         self.download_stop_button.setMinimumWidth(150)
@@ -562,7 +606,7 @@ class MainWindow(QMainWindow):
         tab_layout.addLayout(button_layout)
 
         # Add tab to tab widget
-        self.tab_widget.addTab(download_tab, "Загрузка файлов")
+        self.tab_widget.addTab(download_tab, self.translator.get("tab_file_download"))
 
     def create_file_rename_tab(self):
         """Create the file rename tab."""
@@ -570,7 +614,7 @@ class MainWindow(QMainWindow):
         tab_layout = QVBoxLayout(rename_tab)
 
         # Title
-        title_label = QLabel("Массовое переименование файлов")
+        title_label = QLabel(self.translator.get("rename_title"))
         title_font = QFont()
         title_font.setPointSize(16)
         title_font.setBold(True)
@@ -579,76 +623,76 @@ class MainWindow(QMainWindow):
         tab_layout.addWidget(title_label)
 
         # Input group
-        input_group = QGroupBox("Настройки")
+        input_group = QGroupBox(self.translator.get("settings"))
         input_layout = QVBoxLayout()
 
         # Folder selection
         folder_layout = QHBoxLayout()
-        folder_layout.addWidget(QLabel("Папка с файлами:"))
+        folder_layout.addWidget(QLabel(self.translator.get("folder_with_files")))
         self.rename_folder_input = QLineEdit()
-        self.rename_folder_input.setPlaceholderText("Выберите папку с файлами для переименования...")
+        self.rename_folder_input.setPlaceholderText(self.translator.get("select_files_folder"))
         folder_layout.addWidget(self.rename_folder_input)
-        self.rename_browse_button = QPushButton("Обзор...")
+        self.rename_browse_button = QPushButton(self.translator.get("browse"))
         self.rename_browse_button.clicked.connect(self.browse_rename_folder)
         folder_layout.addWidget(self.rename_browse_button)
         input_layout.addLayout(folder_layout)
 
         # Sort type selection
         sort_layout = QHBoxLayout()
-        sort_layout.addWidget(QLabel("Сортировка:"))
+        sort_layout.addWidget(QLabel(self.translator.get("sort")))
 
         self.rename_sort_combo = QComboBox()
-        self.rename_sort_combo.addItem("По имени (алфавитная)", "name")
-        self.rename_sort_combo.addItem("По числу в имени", "number")
+        self.rename_sort_combo.addItem(self.translator.get("sort_name"), "name")
+        self.rename_sort_combo.addItem(self.translator.get("sort_number"), "number")
         sort_layout.addWidget(self.rename_sort_combo)
         sort_layout.addStretch()
         input_layout.addLayout(sort_layout)
 
         # Rename type selection
         rename_type_layout = QHBoxLayout()
-        rename_type_layout.addWidget(QLabel("Тип переименования:"))
+        rename_type_layout.addWidget(QLabel(self.translator.get("rename_type")))
         self.rename_type_combo = QComboBox()
-        self.rename_type_combo.addItem("Последовательная нумерация (1, 2, 3, ...)", "sequential")
-        self.rename_type_combo.addItem("Только цифры из имени", "numbers_only")
-        self.rename_type_combo.addItem("Только текст из имени", "text_only")
-        self.rename_type_combo.addItem("Только число в конце имени", "numbers_only_at_end")
+        self.rename_type_combo.addItem(self.translator.get("rename_sequential"), "sequential")
+        self.rename_type_combo.addItem(self.translator.get("rename_numbers_only"), "numbers_only")
+        self.rename_type_combo.addItem(self.translator.get("rename_text_only"), "text_only")
+        self.rename_type_combo.addItem(self.translator.get("rename_numbers_only_at_end"), "numbers_only_at_end")
         rename_type_layout.addWidget(self.rename_type_combo)
         rename_type_layout.addStretch()
         input_layout.addLayout(rename_type_layout)
 
         # Prefix input
         prefix_layout = QHBoxLayout()
-        prefix_layout.addWidget(QLabel("Префикс (необязательно):"))
+        prefix_layout.addWidget(QLabel(self.translator.get("prefix")))
         self.rename_prefix_input = QLineEdit()
-        self.rename_prefix_input.setPlaceholderText("Например: photo_")
+        self.rename_prefix_input.setPlaceholderText(self.translator.get("prefix_placeholder"))
         prefix_layout.addWidget(self.rename_prefix_input)
         prefix_layout.addStretch()
         input_layout.addLayout(prefix_layout)
 
         # Suffix input
         suffix_layout = QHBoxLayout()
-        suffix_layout.addWidget(QLabel("Суффикс (необязательно):"))
+        suffix_layout.addWidget(QLabel(self.translator.get("suffix")))
         self.rename_suffix_input = QLineEdit()
-        self.rename_suffix_input.setPlaceholderText("Например: _edited")
+        self.rename_suffix_input.setPlaceholderText(self.translator.get("suffix_placeholder"))
         suffix_layout.addWidget(self.rename_suffix_input)
         suffix_layout.addStretch()
         input_layout.addLayout(suffix_layout)
 
         # Zero padding input
         zero_num_layout = QHBoxLayout()
-        zero_num_layout.addWidget(QLabel("Дополнение нулями:"))
+        zero_num_layout.addWidget(QLabel(self.translator.get("zero_padding")))
         self.rename_zero_num_spinbox = QSpinBox()
         self.rename_zero_num_spinbox.setMinimum(0)
         self.rename_zero_num_spinbox.setMaximum(10)
         self.rename_zero_num_spinbox.setValue(0)
-        self.rename_zero_num_spinbox.setToolTip("Число нулей перед числом в названии файла (0 = не используется)")
+        self.rename_zero_num_spinbox.setToolTip(self.translator.get("zero_padding_tooltip"))
         zero_num_layout.addWidget(self.rename_zero_num_spinbox)
-        zero_num_layout.addWidget(QLabel("(0 = не используется, 1 = 09, 2 = 009)"))
+        zero_num_layout.addWidget(QLabel(self.translator.get("zero_padding_hint")))
         zero_num_layout.addStretch()
         input_layout.addLayout(zero_num_layout)
 
         # Dry run checkbox
-        self.rename_dry_run_checkbox = QCheckBox("Предварительный просмотр (не переименовывать файлы)")
+        self.rename_dry_run_checkbox = QCheckBox(self.translator.get("dry_run"))
         self.rename_dry_run_checkbox.setChecked(True)  # Enable by default for safety
         input_layout.addWidget(self.rename_dry_run_checkbox)
 
@@ -661,7 +705,7 @@ class MainWindow(QMainWindow):
         tab_layout.addWidget(self.rename_progress_bar)
 
         # Log output
-        log_group = QGroupBox("Журнал переименования")
+        log_group = QGroupBox(self.translator.get("rename_log"))
         log_layout = QVBoxLayout()
         self.rename_log_text = QTextEdit()
         self.rename_log_text.setReadOnly(True)
@@ -674,12 +718,12 @@ class MainWindow(QMainWindow):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
 
-        self.rename_start_button = QPushButton("Начать переименование")
+        self.rename_start_button = QPushButton(self.translator.get("start_rename"))
         self.rename_start_button.clicked.connect(self.start_renaming)
         self.rename_start_button.setMinimumWidth(150)
         button_layout.addWidget(self.rename_start_button)
 
-        self.rename_stop_button = QPushButton("Остановить")
+        self.rename_stop_button = QPushButton(self.translator.get("stop"))
         self.rename_stop_button.clicked.connect(self.stop_renaming)
         self.rename_stop_button.setEnabled(False)
         self.rename_stop_button.setMinimumWidth(150)
@@ -689,13 +733,13 @@ class MainWindow(QMainWindow):
         tab_layout.addLayout(button_layout)
 
         # Add tab to tab widget
-        self.tab_widget.addTab(rename_tab, "Переименование файлов")
+        self.tab_widget.addTab(rename_tab, self.translator.get("tab_file_rename"))
 
     def browse_folder(self):
         """Open folder browser dialog."""
         folder = QFileDialog.getExistingDirectory(
             self,
-            "Выберите папку с видеофайлами",
+            self.translator.get("select_video_folder_dialog"),
             "",
             QFileDialog.Option.ShowDirsOnly
         )
@@ -706,7 +750,7 @@ class MainWindow(QMainWindow):
         """Open file browser dialog for input file."""
         file, _ = QFileDialog.getOpenFileName(
             self,
-            "Выберите файл с URL-ссылками",
+            self.translator.get("select_url_file_dialog"),
             "",
             "Spreadsheet Files (*.xls *.xlsx *.csv);;All Files (*)"
         )
@@ -717,7 +761,7 @@ class MainWindow(QMainWindow):
         """Open folder browser dialog for download folder."""
         folder = QFileDialog.getExistingDirectory(
             self,
-            "Выберите папку для загрузки файлов",
+            self.translator.get("select_download_folder_dialog"),
             "",
             QFileDialog.Option.ShowDirsOnly
         )
@@ -731,8 +775,8 @@ class MainWindow(QMainWindow):
         if not folder_path:
             QMessageBox.warning(
                 self,
-                "Ошибка",
-                "Пожалуйста, выберите папку с видеофайлами"
+                self.translator.get("error"),
+                self.translator.get("please_select_folder")
             )
             return
 
@@ -740,8 +784,8 @@ class MainWindow(QMainWindow):
         if not folder_path.exists() or not folder_path.is_dir():
             QMessageBox.warning(
                 self,
-                "Ошибка",
-                f"Папка '{folder_path}' не существует или не является директорией"
+                self.translator.get("error"),
+                self.translator.get("folder_not_exists", folder_path)
             )
             return
 
@@ -764,20 +808,21 @@ class MainWindow(QMainWindow):
             folder_path,
             height,
             remove_audio,
-            create_thumbs
+            create_thumbs,
+            self.translator
         )
         self.processor_thread.progress.connect(self.update_progress)
         self.processor_thread.log.connect(self.add_log)
         self.processor_thread.finished.connect(self.processing_finished)
         self.processor_thread.start()
 
-        self.statusBar().showMessage("Обработка...")
+        self.statusBar().showMessage(self.translator.get("processing"))
 
     def stop_processing(self):
         """Stop video processing."""
         if self.processor_thread and self.processor_thread.isRunning():
             self.processor_thread.stop()
-            self.add_log("Остановка обработки...")
+            self.add_log(self.translator.get("stopping_processing"))
             self.stop_button.setEnabled(False)
 
     def update_progress(self, value: int):
@@ -801,25 +846,25 @@ class MainWindow(QMainWindow):
 
         # Show summary
         self.add_log("\n" + "=" * 50)
-        self.add_log("Обработка завершена!")
-        self.add_log(f"Успешно: {stats['successful']}")
-        self.add_log(f"Ошибок: {stats['failed']}")
-        self.add_log(f"Всего: {stats['total']}")
+        self.add_log(self.translator.get("processing_complete_summary"))
+        self.add_log(self.translator.get("successful", stats['successful']))
+        self.add_log(self.translator.get("errors", stats['failed']))
+        self.add_log(self.translator.get("total", stats['total']))
 
         if self.create_thumbs_checkbox.isChecked():
-            self.add_log(f"Миниатюр создано: {stats['thumbs_created']}")
-            self.add_log(f"Ошибок миниатюр: {stats['thumbs_failed']}")
+            self.add_log(self.translator.get("thumbs_created", stats['thumbs_created']))
+            self.add_log(self.translator.get("thumbs_errors", stats['thumbs_failed']))
 
         self.add_log("=" * 50)
 
-        self.statusBar().showMessage("Готов к работе")
+        self.statusBar().showMessage(self.translator.get("ready"))
 
         # Show completion message
         if stats['total'] > 0:
             QMessageBox.information(
                 self,
-                "Обработка завершена",
-                f"Успешно обработано: {stats['successful']}/{stats['total']}"
+                self.translator.get("processing_complete"),
+                self.translator.get("processing_complete_msg", stats['successful'], stats['total'])
             )
 
     def start_downloading(self):
@@ -829,8 +874,8 @@ class MainWindow(QMainWindow):
         if not file_path:
             QMessageBox.warning(
                 self,
-                "Ошибка",
-                "Пожалуйста, выберите файл с URL-ссылками"
+                self.translator.get("error"),
+                self.translator.get("please_select_url_file")
             )
             return
 
@@ -838,8 +883,8 @@ class MainWindow(QMainWindow):
         if not file_path.exists() or not file_path.is_file():
             QMessageBox.warning(
                 self,
-                "Ошибка",
-                f"Файл '{file_path}' не существует или не является файлом"
+                self.translator.get("error"),
+                self.translator.get("file_not_exists", file_path)
             )
             return
 
@@ -847,8 +892,8 @@ class MainWindow(QMainWindow):
         if file_path.suffix.lower() not in ['.csv', '.xlsx', '.xls']:
             QMessageBox.warning(
                 self,
-                "Ошибка",
-                "Поддерживаются только файлы форматов: XLS, XLSX, CSV"
+                self.translator.get("error"),
+                self.translator.get("unsupported_format")
             )
             return
 
@@ -857,8 +902,8 @@ class MainWindow(QMainWindow):
         if not output_folder:
             QMessageBox.warning(
                 self,
-                "Ошибка",
-                "Пожалуйста, выберите папку для загрузки файлов"
+                self.translator.get("error"),
+                self.translator.get("please_select_download_folder")
             )
             return
 
@@ -875,19 +920,19 @@ class MainWindow(QMainWindow):
         self.download_browse_folder_button.setEnabled(False)
 
         # Start downloading thread
-        self.downloader_thread = FileDownloaderThread(file_path, output_folder)
+        self.downloader_thread = FileDownloaderThread(file_path, output_folder, self.translator)
         self.downloader_thread.progress.connect(self.update_download_progress)
         self.downloader_thread.log.connect(self.add_download_log)
         self.downloader_thread.finished.connect(self.downloading_finished)
         self.downloader_thread.start()
 
-        self.statusBar().showMessage("Загрузка...")
+        self.statusBar().showMessage(self.translator.get("downloading"))
 
     def stop_downloading(self):
         """Stop file downloading."""
         if self.downloader_thread and self.downloader_thread.isRunning():
             self.downloader_thread.stop()
-            self.add_download_log("Остановка загрузки...")
+            self.add_download_log(self.translator.get("stopping_download"))
             self.download_stop_button.setEnabled(False)
 
     def update_download_progress(self, value: int):
@@ -912,28 +957,28 @@ class MainWindow(QMainWindow):
 
         # Show summary
         self.add_download_log("\n" + "=" * 50)
-        self.add_download_log("Загрузка завершена!")
-        self.add_download_log(f"Успешно: {stats['successful']}")
-        self.add_download_log(f"Ошибок: {stats['failed']}")
-        self.add_download_log(f"Пропущено: {stats['skipped']}")
-        self.add_download_log(f"Всего URL: {stats['total']}")
+        self.add_download_log(self.translator.get("download_complete_summary"))
+        self.add_download_log(self.translator.get("successful", stats['successful']))
+        self.add_download_log(self.translator.get("errors", stats['failed']))
+        self.add_download_log(self.translator.get("skipped", stats['skipped']))
+        self.add_download_log(self.translator.get("total_urls", stats['total']))
         self.add_download_log("=" * 50)
 
-        self.statusBar().showMessage("Готов к работе")
+        self.statusBar().showMessage(self.translator.get("ready"))
 
         # Show completion message
         if stats['total'] > 0:
             QMessageBox.information(
                 self,
-                "Загрузка завершена",
-                f"Успешно загружено: {stats['successful']}/{stats['total']}"
+                self.translator.get("download_complete"),
+                self.translator.get("download_complete_msg", stats['successful'], stats['total'])
             )
 
     def browse_rename_folder(self):
         """Open folder browser dialog for rename folder."""
         folder = QFileDialog.getExistingDirectory(
             self,
-            "Выберите папку с файлами для переименования",
+            self.translator.get("select_files_folder_dialog"),
             "",
             QFileDialog.Option.ShowDirsOnly
         )
@@ -947,8 +992,8 @@ class MainWindow(QMainWindow):
         if not folder_path:
             QMessageBox.warning(
                 self,
-                "Ошибка",
-                "Пожалуйста, выберите папку с файлами"
+                self.translator.get("error"),
+                self.translator.get("please_select_files_folder")
             )
             return
 
@@ -956,8 +1001,8 @@ class MainWindow(QMainWindow):
         if not folder_path.exists() or not folder_path.is_dir():
             QMessageBox.warning(
                 self,
-                "Ошибка",
-                f"Папка '{folder_path}' не существует или не является директорией"
+                self.translator.get("error"),
+                self.translator.get("folder_not_exists", folder_path)
             )
             return
 
@@ -986,20 +1031,21 @@ class MainWindow(QMainWindow):
             prefix,
             suffix,
             dry_run,
-            zero_num
+            zero_num,
+            self.translator
         )
         self.renamer_thread.progress.connect(self.update_rename_progress)
         self.renamer_thread.log.connect(self.add_rename_log)
         self.renamer_thread.finished.connect(self.renaming_finished)
         self.renamer_thread.start()
 
-        self.statusBar().showMessage("Переименование...")
+        self.statusBar().showMessage(self.translator.get("renaming"))
 
     def stop_renaming(self):
         """Stop file renaming."""
         if self.renamer_thread and self.renamer_thread.isRunning():
             self.renamer_thread.stop()
-            self.add_rename_log("Остановка переименования...")
+            self.add_rename_log(self.translator.get("stopping_rename"))
             self.rename_stop_button.setEnabled(False)
 
     def update_rename_progress(self, value: int):
@@ -1024,30 +1070,29 @@ class MainWindow(QMainWindow):
         # Show summary
         self.add_rename_log("\n" + "=" * 50)
         if self.rename_dry_run_checkbox.isChecked():
-            self.add_rename_log("Предварительный просмотр завершен! Файлы не были переименованы.")
+            self.add_rename_log(self.translator.get("preview_complete"))
         else:
-            self.add_rename_log("Переименование завершено!")
-        self.add_rename_log(f"Успешно: {stats['successful']}")
-        self.add_rename_log(f"Ошибок: {stats['failed']}")
-        self.add_rename_log(f"Всего: {stats['total']}")
+            self.add_rename_log(self.translator.get("rename_complete_summary"))
+        self.add_rename_log(self.translator.get("successful", stats['successful']))
+        self.add_rename_log(self.translator.get("errors", stats['failed']))
+        self.add_rename_log(self.translator.get("total", stats['total']))
         self.add_rename_log("=" * 50)
 
-        self.statusBar().showMessage("Готов к работе")
+        self.statusBar().showMessage(self.translator.get("ready"))
 
         # Show completion message
         if stats['total'] > 0:
             if self.rename_dry_run_checkbox.isChecked():
                 QMessageBox.information(
                     self,
-                    "Предварительный просмотр завершен",
-                    f"Просмотрено: {stats['successful']}/{stats['total']} файлов\n\n"
-                    "Снимите галочку 'Предварительный просмотр' для фактического переименования."
+                    self.translator.get("rename_preview_complete"),
+                    self.translator.get("rename_preview_msg", stats['successful'], stats['total'])
                 )
             else:
                 QMessageBox.information(
                     self,
-                    "Переименование завершено",
-                    f"Успешно переименовано: {stats['successful']}/{stats['total']}"
+                    self.translator.get("rename_complete"),
+                    self.translator.get("rename_complete_msg", stats['successful'], stats['total'])
                 )
 
 
