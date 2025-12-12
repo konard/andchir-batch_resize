@@ -1,6 +1,8 @@
 # Batch Video Resize
 
-Скрипт для массового изменения размеров видео в папке с использованием FFmpeg.
+Набор скриптов для массовой обработки медиафайлов:
+- `main.py` - массовое изменение размеров видео в папке с использованием FFmpeg
+- `download.py` - скачивание файлов из URL-ссылок, найденных в XLS, XLSX или CSV файлах
 
 ## Требования
 
@@ -165,6 +167,84 @@ Failed: 0
 Total: 3
 Thumbnails created: 3
 Thumbnails failed: 0
+==================================================
+```
+
+## Скрипт download.py
+
+Скрипт для скачивания файлов из URL-ссылок, найденных в XLS, XLSX или CSV файлах.
+
+### Использование download.py
+
+```bash
+python download.py <путь_к_файлу> <папка_для_сохранения>
+```
+
+Где:
+- `<путь_к_файлу>` - путь к XLS, XLSX или CSV файлу с URL-ссылками
+- `<папка_для_сохранения>` - папка, куда будут загружены файлы
+
+### Примеры download.py
+
+Скачать файлы из XLSX файла:
+```bash
+python download.py data.xlsx /path/to/downloads
+```
+
+Скачать файлы из CSV файла:
+```bash
+python download.py urls.csv ~/Downloads
+```
+
+Скачать файлы из XLS файла:
+```bash
+python download.py data.xls ./files
+```
+
+### Поддерживаемые форматы файлов
+
+- `.csv` - CSV файлы (разделители - запятая)
+- `.xlsx` - Excel файлы нового формата (требуется библиотека openpyxl)
+- `.xls` - Excel файлы старого формата (требуется библиотека xlrd)
+
+### Особенности работы download.py
+
+- Скрипт читает все ячейки во всех листах файла
+- Автоматически определяет и извлекает URL-ссылки (http:// и https://)
+- Распознает как обычные URL в тексте, так и гиперссылки в Excel
+- Извлекает имя файла из URL, если возможно
+- Пропускает уже скачанные файлы
+- Обрабатывает ошибки сети и недоступные URL
+- Выводит подробный отчет о скачивании
+
+### Пример вывода download.py
+
+```
+Output directory: /home/user/downloads
+Reading file: /home/user/data.xlsx
+Found 5 unique URL(s) in the file
+
+[1/5] Processing: https://example.com/image.png
+Downloaded: image.png
+
+[2/5] Processing: https://example.com/file.pdf
+Downloaded: file.pdf
+
+[3/5] Processing: https://example.com/already-downloaded.jpg
+Skipped (already exists): already-downloaded.jpg
+
+[4/5] Processing: https://example.com/not-found.txt
+Error downloading https://example.com/not-found.txt: HTTP Error 404: Not Found
+
+[5/5] Processing: https://example.com/document.docx
+Downloaded: document.docx
+
+==================================================
+Download complete!
+Successful: 3
+Failed: 1
+Skipped: 1
+Total URLs: 5
 ==================================================
 ```
 
