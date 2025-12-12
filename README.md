@@ -1,6 +1,8 @@
 # Batch Video Resize
 
-Скрипт для массового изменения размеров видео в папке с использованием FFmpeg.
+Набор скриптов для массовой обработки медиафайлов:
+- `main.py` - массовое изменение размеров видео в папке с использованием FFmpeg
+- `download.py` - скачивание файлов из URL-ссылок, найденных в XLS, XLSX или CSV файлах
 
 ## Требования
 
@@ -190,54 +192,75 @@ Thumbnails failed: 0
 ==================================================
 ```
 
-## Сборка исполняемого файла
+## Скрипт download.py
 
-Для создания standalone приложения (исполняемого файла без необходимости установки Python) можно использовать PyInstaller.
+Скрипт для скачивания файлов из URL-ссылок, найденных в XLS, XLSX или CSV файлах.
 
-### Установка PyInstaller
+### Использование download.py
 
 ```bash
-pip install pyinstaller
+python download.py <путь_к_файлу> <папка_для_сохранения>
 ```
 
-### Сборка GUI приложения
+Где:
+- `<путь_к_файлу>` - путь к XLS, XLSX или CSV файлу с URL-ссылками
+- `<папка_для_сохранения>` - папка, куда будут загружены файлы
 
-#### Linux/macOS:
+### Примеры download.py
 
+Скачать файлы из XLSX файла:
 ```bash
-pyinstaller --onefile --windowed --name="BatchVideoResize" gui.py
+python download.py data.xlsx /path/to/downloads
 ```
 
-#### Windows:
-
+Скачать файлы из CSV файла:
 ```bash
-pyinstaller --onefile --windowed --name="BatchVideoResize" --icon=icon.ico gui.py
+python download.py urls.csv ~/Downloads
 ```
 
-### Сборка CLI приложения
-
+Скачать файлы из XLS файла:
 ```bash
-pyinstaller --onefile --name="batch-resize" main.py
+python download.py data.xls ./files
 ```
 
-### Параметры сборки
+### Поддерживаемые форматы файлов
 
-- `--onefile` - создает один исполняемый файл
-- `--windowed` - скрывает консольное окно (только для GUI)
-- `--name` - имя исполняемого файла
-- `--icon` - путь к иконке приложения (опционально)
+- `.csv` - CSV файлы (разделители - запятая)
+- `.xlsx` - Excel файлы нового формата (требуется библиотека openpyxl)
+- `.xls` - Excel файлы старого формата (требуется библиотека xlrd)
 
-После сборки исполняемый файл будет находиться в папке `dist/`.
+### Особенности работы download.py
 
-**Важно:** FFmpeg должен быть установлен в системе и доступен через PATH для работы собранного приложения.
+- Скрипт читает все ячейки во всех листах файла
+- Автоматически определяет и извлекает URL-ссылки (http:// и https://)
+- Распознает как обычные URL в тексте, так и гиперссылки в Excel
+- Извлекает имя файла из URL, если возможно
+- Пропускает уже скачанные файлы
+- Обрабатывает ошибки сети и недоступные URL
+- Выводит подробный отчет о скачивании
 
-### Альтернативная сборка с включением FFmpeg
+### Пример вывода download.py
 
-Для создания полностью автономного приложения можно включить FFmpeg в сборку:
+```
+Output directory: /home/user/downloads
+Reading file: /home/user/data.xlsx
+Found 5 unique URL(s) in the file
 
-```bash
-# Скачайте ffmpeg и поместите в папку проекта
-pyinstaller --onefile --windowed --add-binary "ffmpeg:." --name="BatchVideoResize" gui.py
+[1/5] Processing: https://example.com/image.png
+Downloaded: image.png
+
+[2/5] Processing: https://example.com/file.pdf
+Downloaded: file.pdf
+
+[3/5] Processing: https://example.com/already-downloaded.jpg
+Skipped (already exists): already-downloaded.jpg
+
+[4/5] Processing: https://example.com/not-found.txt
+Error downloading https://example.com/not-found.txt: HTTP Error 404: Not Found
+
+[5/5] Processing: https://example.com/document.docx
+Downloaded: document.docx
+
 ```
 
 ## Лицензия
