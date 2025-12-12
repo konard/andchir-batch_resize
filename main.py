@@ -139,7 +139,7 @@ def main():
         epilog="""
 Examples:
   python main.py /path/to/videos 720
-  python main.py /path/to/videos 1080 --remove_audio
+  python main.py /path/to/videos 1080 --remove-audio
   python main.py /path/to/videos 720 --create_thumbs
         """
     )
